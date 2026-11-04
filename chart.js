@@ -12,13 +12,13 @@ function line(cv,pts,start,marks,opt){opt=opt||{};const {g,w,h}=fit(cv);g.clearR
   const t0=pts.length?pts[0][0]:0,t1=pts.length?pts[pts.length-1][0]:1;
   // lay marks out first: a later mark that would overlap moves up a row
   g.font='600 11px -apple-system,system-ui,sans-serif';const X0=t=>t1>t0?(t-t0)/(t1-t0)*w:w/2;
-  const rows=[],lay=(marks||[]).filter(m=>m.ts>=t0&&m.ts<=t1).sort((x,y)=>x.ts-y.ts).map(m=>{const tw=g.measureText(m.text).width+12,x=Math.min(Math.max(X0(m.ts)-tw/2,0),w-tw);let r=0;
+  const rows=[],lay=(marks||[]).filter(m=>m.ts>=t0&&m.ts<=t1).sort((x,y)=>x.ts-y.ts).map(m=>{const tw=g.measureText(m.text).width+(m.ini!=null?28:12),x=Math.min(Math.max(X0(m.ts)-tw/2,0),w-tw);let r=0;
     while(rows[r]!=null&&rows[r]>x-4)r++;rows[r]=x+tw;return {m,tw,x,r};});
   const top=12+Math.min(rows.length,5)*20,bot=h-8;
   const vals=pts.map(p=>p[1]).concat([start]);let lo=Math.min(...vals),hi=Math.max(...vals);
   if(hi-lo<1e-9){hi+=Math.max(1,Math.abs(hi)*0.01);lo-=Math.max(1,Math.abs(lo)*0.01);}
   const pad=(hi-lo)*0.08;lo-=pad;hi+=pad;
-  const X=t=>t1>t0?(t-t0)/(t1-t0)*w:w/2,Y=v=>top+(hi-v)/(hi-lo)*(bot-top);
+  const X=t=>t1>t0?(t-t0)/(t1-t0)*(w-8):w/2,Y=v=>top+(hi-v)/(hi-lo)*(bot-top);
   g.setLineDash([4,4]);g.strokeStyle=C.ter;g.lineWidth=1;g.beginPath();g.moveTo(0,Y(start));g.lineTo(w,Y(start));g.stroke();g.setLineDash([]);
   if(pts.length<2)return;
   const a=opt.anim==null?1:opt.anim;const P=pts.map((p,i)=>{let x=X(p[0]),y=Y(p[1]);
@@ -30,10 +30,20 @@ function line(cv,pts,start,marks,opt){opt=opt||{};const {g,w,h}=fit(cv);g.clearR
   const ma=opt.markAnim==null?1:opt.markAnim;g.globalAlpha=ma;
   lay.forEach(({m,tw,x,r})=>{if(r>=5)return;const y=top-20-r*20+2;
     const col=m.kind==='buy'?C.blue:(m.kind==='win'?C.green:C.red);
+    if(m.ini!=null){ // reference look: dark pill, green/red border, coin initial disc, PnL text
+      g.strokeStyle=col;g.lineWidth=1;g.setLineDash([2,2]);g.beginPath();g.moveTo(X(m.ts),y+19);g.lineTo(X(m.ts),Y(valAt(pts,m.ts)));g.stroke();g.setLineDash([]);
+      g.fillStyle='rgba(0,40,18,0.92)';g.beginPath();if(g.roundRect)g.roundRect(x,y,tw,19,9.5);else g.rect(x,y,tw,19);g.fill();g.stroke();
+      g.fillStyle=col;g.beginPath();g.arc(x+10,y+9.5,6.5,0,Math.PI*2);g.fill();
+      g.fillStyle='#000';g.font='700 9px -apple-system,system-ui,sans-serif';g.textAlign='center';g.fillText(m.ini,x+10,y+12.8);g.textAlign='left';
+      g.font='600 11px -apple-system,system-ui,sans-serif';g.fillStyle=col;g.fillText(m.text,x+20,y+13.5);
+      g.fillStyle=col;g.beginPath();g.arc(X(m.ts),Y(valAt(pts,m.ts)),3,0,Math.PI*2);g.fill();return;}
     g.fillStyle=col;g.beginPath();if(g.roundRect)g.roundRect(x,y,tw,17,8.5);else g.rect(x,y,tw,17);g.fill();
     g.fillStyle='#fff';g.fillText(m.text,x+6,y+12.5);
     g.strokeStyle=col;g.lineWidth=1;g.beginPath();g.moveTo(X(m.ts),y+17);g.lineTo(X(m.ts),Y(valAt(pts,m.ts)));g.stroke();});
-  g.globalAlpha=1;}
+  g.globalAlpha=1;
+  // dot at the latest point (with a soft halo)
+  const L=P[P.length-1];g.fillStyle='rgba(0,211,90,0.25)';g.beginPath();g.arc(L[0],L[1],7,0,Math.PI*2);g.fill();
+  g.fillStyle=C.green;g.beginPath();g.arc(L[0],L[1],4,0,Math.PI*2);g.fill();}
 function valAt(pts,t){let v=pts[0][1];for(const p of pts){if(p[0]>t)break;v=p[1];}return v;}
 
 /* candles [[t,o,h,l,c,vol]], exitLine price or null */

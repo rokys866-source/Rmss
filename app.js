@@ -6,7 +6,7 @@ const DATA_URL='https://api.github.com/repos/rokys866-source/Rmss1/contents/desk
 const POLL_S=15, STALE_S=120, TZ='Europe/Stockholm';
 const qs=new URLSearchParams(location.search), SRC=qs.get('src');
 const $=s=>document.querySelector(s), RM=Charts.RM;
-let B=null, etag=null, err=null, lastOk=0, nextTry=0, tab=qs.get('tab')||'home', sheet=null, range='1D', actN=30, prevLast=null, prevMarks=-1, beamT=null;
+let B=null, etag=null, err=null, lastOk=0, nextTry=0, tab=qs.get('tab')||'home', sheet=null, range='LIVE', actN=30, prevLast=null, prevMarks=-1, beamT=null;
 
 (function(){const m=location.hash.match(/[#&]g=([^&]+)/);
   if(m){try{localStorage.setItem('gh',decodeURIComponent(m[1]));}catch(e){} history.replaceState(null,'',location.pathname+location.search);}})();
@@ -104,17 +104,25 @@ function home(){const el=$('#tab-home');
     <div class="chart"><canvas id="line"></canvas><div class="emp hidden" id="lemp">Waiting for the first trade</div></div>
     <div class="rng" id="rng">${['LIVE','1H','4H','1D','1W','ALL'].map(r=>`<button data-r="${r}">${r}</button>`).join('')}</div>
     <h2 id="agh"></h2><div class="car" id="car"></div><h2>Activity <button data-goto="activity">See all</button></h2><div class="list" id="last5"></div>`;el.dataset.built=1;}
-  const st=B.state;odometer($('#odo'),money(st.balance));$('#pb').classList.toggle('hidden',B.mode!=='PAPER');
-  const t=$('#today');t.textContent=pctS(st.today_pct)+' today';t.className='num '+(st.today_pct>=0?'up':'dn');$('#mult').textContent=(st.multiplier||1).toFixed(2)+'×';
+  const st=B.state;$('#pb').classList.toggle('hidden',B.mode!=='PAPER');
+  const eq=B.equity||{value:st.balance,start:st.start,change:st.balance-st.start,pct:st.start?(st.balance/st.start-1)*100:0,mult:st.start?st.balance/st.start:1};
+  odometer($('#odo'),money(eq.value));
+  const t=$('#today'),up=eq.change>=0;t.textContent=(up?'▲ ':'▼ ')+money(Math.abs(eq.change))+' ('+pctS(eq.pct)+')';t.className='num '+(up?'up':'dn');
+  const mu=$('#mult');mu.textContent=(eq.mult||1).toFixed(2)+'×';mu.classList.toggle('neg',!up);
   [...$('#rng').children].forEach(b=>b.classList.toggle('on',b.dataset.r===range));
   drawLine();
   $('#agh').textContent=`Agents · ${running()} running`;const car=$('#car'),sl=car.scrollLeft;car.innerHTML=AG.map(agentCard).join('');car.scrollLeft=sl;drawRings();
   const a=(B.activity||[]).slice(0,5);$('#last5').innerHTML=a.length?a.map(actRow).join(''):'<div class="empty">Nothing yet tonight</div>';}
-function drawLine(){const cv=$('#line');if(!cv)return;const pts=(B.chart||{})[range]||[],marks=B.marks||[];
-  const noTrades=!(B.state.open||[]).length&&!(B.state.closed||[]).length&&!marks.length;$('#lemp').classList.toggle('hidden',!noTrades);
+function drawLine(){const cv=$('#line');if(!cv)return;const eq=B.equity,start=eq?eq.start:B.state.start;
+  let pts=((eq&&eq.series)||B.chart||{})[range]||[];
+  if(pts.length<2){const n=B.generated_ts||Date.now()/1000,v=pts.length?pts[0][1]:(eq?eq.value:start);pts=[[n-1800,v],[n,v]];}
+  // only the last 4 closed trades in view get a label (coin initial + PnL), like the reference
+  const t0v=pts[0][0],marks=eq?(eq.closed||[]).filter(c=>c.ts>=t0v).slice(0,4).map(c=>({ts:c.ts,kind:c.pnl_usd>=0?'win':'loss',ini:((c.symbol||c.name||'?')+'').trim().charAt(0).toUpperCase(),text:sgn(c.pnl_usd)})):(B.marks||[]);
+  const noTrades=eq?!(eq.closed||[]).length&&!(B.state.open||[]).length:(!(B.state.open||[]).length&&!(B.state.closed||[]).length&&!marks.length);
+  $('#lemp').textContent='No trades yet';$('#lemp').classList.toggle('hidden',!noTrades);
   const last=pts.length?pts[pts.length-1][0]:null,isNew=prevLast!=null&&last!==prevLast&&!RM,mNew=prevMarks>=0&&marks.length!==prevMarks&&!RM;prevLast=last;prevMarks=marks.length;
   const t0=performance.now();(function f(){const k=Math.min(1,(performance.now()-t0)/250),m=Math.min(1,(performance.now()-t0)/200);
-    Charts.line(cv,pts,B.state.start,noTrades?[]:marks,{anim:isNew?k:1,markAnim:mNew?m:1});if((isNew&&k<1)||(mNew&&m<1))requestAnimationFrame(f);})();}
+    Charts.line(cv,pts,start,marks,{anim:isNew?k:1,markAnim:mNew?m:1});if((isNew&&k<1)||(mNew&&m<1))requestAnimationFrame(f);})();}
 function drawRings(){const a=B.state.agents.analyst||{},cv=document.getElementById('ring-analyst');if(cv)Charts.ring(cv,a.last?a.last.score:null,a.threshold||70);
   document.querySelectorAll('canvas[data-ring]').forEach(c=>Charts.ring(c,a.last?a.last.score:null,a.threshold||70));}
 
