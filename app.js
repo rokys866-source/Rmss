@@ -220,7 +220,7 @@ function render(){errRow();
   const su=err&&!B?setup():null;
   ['home','agents','activity','account'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==tab));
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
-  if(su){$('#tab-'+tab).innerHTML=su;$('#tab-home').dataset.built='';return;}
+  if(su){if(err.kind==='token'&&$('#glink'))return;$('#tab-'+tab).innerHTML=su;$('#tab-home').dataset.built='';return;}
   if(!B){if(tab==='home'&&!$('#tab-home').dataset.built)$('#tab-home').innerHTML=skel();else if(tab!=='home')$('#tab-'+tab).innerHTML=skel();return;}
   const seen=+(localStorage.getItem('seenPush')||0);$('#belldot').classList.toggle('hidden',!(B.pushes||[]).some(p=>p.ts>seen));
   if(tab==='home')home();if(tab==='agents')agents();if(tab==='activity')activity();if(tab==='account')account();
