@@ -1,37 +1,70 @@
-/* Tiny canvas charts: price line with entry + orange dashed "Risk trailing stop", audit disc, score ring. */
+/* Canvas drawing, devicePixelRatio aware: Home line chart with marks, Coin candles + volume, score ring, Auditor disc stack. */
 (function(){
-function setup(cv){const r=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*r;cv.height=h*r;const c=cv.getContext('2d');c.scale(r,r);return [c,w,h];}
-function fmt(p){if(p==null)return'';if(p>=1)return p.toFixed(2);const e=Math.floor(Math.log10(p));return p.toFixed(Math.min(12,-e+2));}
-window.drawPrice=function(cv,pts,o){o=o||{};const [c,w,h]=setup(cv);c.clearRect(0,0,w,h);
-  if(!pts||pts.length<2){c.fillStyle='#8a96a3';c.font='13px sans-serif';c.textAlign='center';c.fillText('No price points yet',w/2,h/2);return;}
-  const ys=pts.map(p=>p[1]).concat([o.entry,o.exitLine].filter(v=>v!=null));
-  let lo=Math.min(...ys),hi=Math.max(...ys);const pad=(hi-lo)*0.08||hi*0.05;lo-=pad;hi+=pad;
-  const t0=pts[0][0],t1=pts[pts.length-1][0]||t0+1,L=6,R=w-62,T=8,B=h-20;
-  const X=t=>L+(R-L)*(t-t0)/Math.max(1,t1-t0),Y=v=>B-(B-T)*(v-lo)/(hi-lo);
-  c.strokeStyle='#222b36';c.lineWidth=1;for(let i=0;i<4;i++){const y=T+(B-T)*i/3;c.beginPath();c.moveTo(L,y);c.lineTo(R,y);c.stroke();}
-  const last=pts[pts.length-1][1],up=o.entry==null||last>=o.entry;
-  const g=c.createLinearGradient(0,T,0,B);g.addColorStop(0,up?'rgba(33,195,122,.28)':'rgba(255,91,91,.28)');g.addColorStop(1,'rgba(0,0,0,0)');
-  c.beginPath();pts.forEach((p,i)=>i?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.lineTo(X(t1),B);c.lineTo(X(t0),B);c.closePath();c.fillStyle=g;c.fill();
-  c.beginPath();pts.forEach((p,i)=>i?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.strokeStyle=up?'#21c37a':'#ff5b5b';c.lineWidth=2;c.stroke();
-  function hline(v,col,dash,label){if(v==null)return;c.save();c.setLineDash(dash);c.strokeStyle=col;c.lineWidth=1.6;c.beginPath();c.moveTo(L,Y(v));c.lineTo(R,Y(v));c.stroke();c.restore();
-    c.fillStyle=col;c.font='10.5px sans-serif';c.textAlign='left';c.fillText(label,R+4,Y(v)-2);c.fillText(fmt(v),R+4,Y(v)+10);}
-  hline(o.entry,'#8a96a3',[2,3],'entry');hline(o.exitLine,'#ff9f2e',[7,5],o.exitLabel||'stop');
-  c.fillStyle='#8a96a3';c.font='10px sans-serif';c.textAlign='left';
-  const tl=t=>new Date(t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Stockholm'});
-  c.fillText(tl(t0),L,h-5);c.textAlign='right';c.fillText(tl(t1),R,h-5);
-};
-window.drawDisc=function(cv,layers,progress){const [c,w,h]=setup(cv);c.clearRect(0,0,w,h);const cx=w/2,cy=h/2,r=Math.min(w,h)/2-8,n=8;
-  for(let i=0;i<n;i++){const a0=-Math.PI/2+i*2*Math.PI/n+0.04,a1=a0+2*Math.PI/n-0.08,l=layers&&layers[i];
-    let col='#2a3440';if(l&&progress>i)col=l.ok===true?'#21c37a':(l.ok===false?'#ff5b5b':'#3a4552');
-    c.beginPath();c.arc(cx,cy,r,a0,a1);c.arc(cx,cy,r*0.62,a1,a0,true);c.closePath();c.fillStyle=col;c.fill();
-    const am=(a0+a1)/2;c.fillStyle='#0b0f14';c.font='bold 12px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(i+1),cx+Math.cos(am)*r*0.81,cy+Math.sin(am)*r*0.81);}
-  const done=Math.min(n,Math.floor(progress)),green=(layers||[]).slice(0,done).filter(l=>l.ok).length;
-  c.fillStyle='#e8edf2';c.font='bold 22px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(layers?green+'/8':'—',cx,cy-4);
-  c.fillStyle='#8a96a3';c.font='11px sans-serif';c.fillText(done<n&&layers?'auditing…':'layers green',cx,cy+16);
-};
-window.ringSVG=function(score,th){const s=score==null?0:score,R=26,C=2*Math.PI*R,col=score==null?'#2a3440':(s>=th?'#21c37a':'#ff9f2e');
-  return `<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${R}" stroke="#222b36" stroke-width="7" fill="none"/>`+
-  `<circle cx="32" cy="32" r="${R}" stroke="${col}" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="${C*s/100} ${C}" transform="rotate(-90 32 32)"/>`+
-  `<text x="32" y="37" text-anchor="middle" font-size="16" font-weight="700" fill="#e8edf2">${score==null?'—':s}</text></svg>`;};
-window.fmtPrice=fmt;
+const RM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fit(cv){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  cv.width=Math.max(1,Math.round(r.width*d));cv.height=Math.max(1,Math.round(r.height*d));
+  const g=cv.getContext('2d');g.setTransform(d,0,0,d,0,0);return {g,w:r.width,h:r.height};}
+const C={green:'#00d35a',red:'#ff453a',orange:'#ff9f0a',cyan:'#64d2ff',blue:'#0a84ff',yellow:'#ffd60a',pink:'#ff6b9a',
+  sec:'rgba(235,235,245,0.6)',ter:'rgba(235,235,245,0.3)',sep:'rgba(84,84,88,0.55)',card:'#1c1c1e',card2:'#2c2c2e'};
+
+/* line: pts [[ts,v],...], start value, marks [{ts,kind,text}], anim 0..1 for the newest point slide-in */
+function line(cv,pts,start,marks,opt){opt=opt||{};const {g,w,h}=fit(cv);g.clearRect(0,0,w,h);
+  const t0=pts.length?pts[0][0]:0,t1=pts.length?pts[pts.length-1][0]:1;
+  // lay marks out first: a later mark that would overlap moves up a row
+  g.font='600 11px -apple-system,system-ui,sans-serif';const X0=t=>t1>t0?(t-t0)/(t1-t0)*w:w/2;
+  const rows=[],lay=(marks||[]).filter(m=>m.ts>=t0&&m.ts<=t1).sort((x,y)=>x.ts-y.ts).map(m=>{const tw=g.measureText(m.text).width+12,x=Math.min(Math.max(X0(m.ts)-tw/2,0),w-tw);let r=0;
+    while(rows[r]!=null&&rows[r]>x-4)r++;rows[r]=x+tw;return {m,tw,x,r};});
+  const top=12+Math.min(rows.length,5)*20,bot=h-8;
+  const vals=pts.map(p=>p[1]).concat([start]);let lo=Math.min(...vals),hi=Math.max(...vals);
+  if(hi-lo<1e-9){hi+=Math.max(1,Math.abs(hi)*0.01);lo-=Math.max(1,Math.abs(lo)*0.01);}
+  const pad=(hi-lo)*0.08;lo-=pad;hi+=pad;
+  const X=t=>t1>t0?(t-t0)/(t1-t0)*w:w/2,Y=v=>top+(hi-v)/(hi-lo)*(bot-top);
+  g.setLineDash([4,4]);g.strokeStyle=C.ter;g.lineWidth=1;g.beginPath();g.moveTo(0,Y(start));g.lineTo(w,Y(start));g.stroke();g.setLineDash([]);
+  if(pts.length<2)return;
+  const a=opt.anim==null?1:opt.anim;const P=pts.map((p,i)=>{let x=X(p[0]),y=Y(p[1]);
+    if(i===pts.length-1&&a<1){const q=pts[i-1];x=X(q[0])+(x-X(q[0]))*a;y=Y(q[1])+(y-Y(q[1]))*a;}return [x,y];});
+  const grd=g.createLinearGradient(0,top,0,bot);grd.addColorStop(0,'rgba(0,211,90,0.28)');grd.addColorStop(1,'rgba(0,211,90,0)');
+  g.beginPath();g.moveTo(P[0][0],bot);P.forEach(p=>g.lineTo(p[0],p[1]));g.lineTo(P[P.length-1][0],bot);g.closePath();g.fillStyle=grd;g.fill();
+  g.beginPath();P.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.strokeStyle=C.green;g.lineWidth=2;g.lineJoin='round';g.stroke();
+  // marks above the line; a later mark that would overlap moves up a row
+  const ma=opt.markAnim==null?1:opt.markAnim;g.globalAlpha=ma;
+  lay.forEach(({m,tw,x,r})=>{if(r>=5)return;const y=top-20-r*20+2;
+    const col=m.kind==='buy'?C.blue:(m.kind==='win'?C.green:C.red);
+    g.fillStyle=col;g.beginPath();if(g.roundRect)g.roundRect(x,y,tw,17,8.5);else g.rect(x,y,tw,17);g.fill();
+    g.fillStyle='#fff';g.fillText(m.text,x+6,y+12.5);
+    g.strokeStyle=col;g.lineWidth=1;g.beginPath();g.moveTo(X(m.ts),y+17);g.lineTo(X(m.ts),Y(valAt(pts,m.ts)));g.stroke();});
+  g.globalAlpha=1;}
+function valAt(pts,t){let v=pts[0][1];for(const p of pts){if(p[0]>t)break;v=p[1];}return v;}
+
+/* candles [[t,o,h,l,c,vol]], exitLine price or null */
+function candles(cv,cs,exitLine,entry){const {g,w,h}=fit(cv);g.clearRect(0,0,w,h);
+  const vh=h*0.2,ch=h-vh-6;if(!cs.length)return;
+  let lo=Math.min(...cs.map(c=>c[3])),hi=Math.max(...cs.map(c=>c[2]));
+  [exitLine,entry].forEach(v=>{if(v){lo=Math.min(lo,v);hi=Math.max(hi,v);}});
+  if(hi-lo<=0){hi*=1.01;lo*=0.99;}const pad=(hi-lo)*0.06;lo-=pad;hi+=pad;
+  const n=Math.max(cs.length,20),bw=w/n,Y=v=>(hi-v)/(hi-lo)*ch,vmax=Math.max(...cs.map(c=>c[5]||0))||1;
+  cs.forEach((c,i)=>{const x=w-(cs.length-i)*bw+bw/2,up=c[4]>=c[1],col=up?C.green:C.red;g.strokeStyle=col;g.fillStyle=col;
+    g.beginPath();g.moveTo(x,Y(c[2]));g.lineTo(x,Y(c[3]));g.lineWidth=1;g.stroke();
+    const y1=Y(Math.max(c[1],c[4])),y2=Y(Math.min(c[1],c[4]));g.fillRect(x-bw*0.35,y1,bw*0.7,Math.max(1,y2-y1));
+    const vb=(c[5]||0)/vmax*vh;g.globalAlpha=0.45;g.fillRect(x-bw*0.35,h-vb,bw*0.7,vb);g.globalAlpha=1;});
+  if(exitLine){g.setLineDash([5,4]);g.strokeStyle=C.orange;g.lineWidth=1.5;g.beginPath();g.moveTo(0,Y(exitLine));g.lineTo(w,Y(exitLine));g.stroke();g.setLineDash([]);
+    g.fillStyle=C.orange;g.font='600 11px -apple-system,system-ui,sans-serif';g.fillText('Risk trailing stop',6,Y(exitLine)-5);}}
+
+/* score ring 0-100, green from `from` */
+function ring(cv,score,from){const {g,w,h}=fit(cv);g.clearRect(0,0,w,h);const r=Math.min(w,h)/2-6,cx=w/2,cy=h/2;
+  g.lineWidth=8;g.lineCap='round';g.strokeStyle=C.card2;g.beginPath();g.arc(cx,cy,r,0,Math.PI*2);g.stroke();
+  if(score==null)return;g.strokeStyle=score>=from?C.green:C.yellow;g.beginPath();g.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(100,score))/100);g.stroke();}
+
+/* Auditor: the coin as a stack of 8 discs. state[i] = 'wait' | 'read' | true | false */
+function discs(cv,state,beam){const {g,w,h}=fit(cv);g.clearRect(0,0,w,h);const rx=Math.min(w*0.42,140),ry=rx*0.28,step=(h-2*ry-10)/8,cx=w/2;
+  for(let i=7;i>=0;i--){const cy=ry+5+i*step+step/2,s=state[i];
+    const col=s===true?C.green:(s===false?C.red:(s==='read'?C.cyan:C.card2));
+    g.fillStyle=s===true||s===false?col+'33':C.card;g.strokeStyle=col;g.lineWidth=1.5;
+    g.beginPath();g.ellipse(cx,cy+step*0.18,rx,ry,0,0,Math.PI*2);g.fill();
+    g.beginPath();g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);g.fillStyle=s===true||s===false?col+'55':C.card2;g.fill();g.stroke();
+    g.fillStyle=s===true||s===false?'#fff':C.sec;g.font='600 12px -apple-system,system-ui,sans-serif';g.textAlign='center';
+    g.fillText(s===true?'✓':(s===false?'✕':String(i+1)),cx,cy+4);g.textAlign='left';}
+  if(beam!=null){const y=ry+5+beam*step;g.fillStyle='rgba(100,210,255,0.85)';g.fillRect(cx-rx-8,y,2*rx+16,2);}}
+
+window.Charts={line,candles,ring,discs,fit,C,RM};
 })();
