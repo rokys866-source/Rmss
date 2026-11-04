@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="referrer" content="no-referrer">
+<title>RMSS Desk</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="banner" class="banner hidden"></div>
+<header class="top">
+  <div class="brand"><span class="logo">R</span><span>RMSS Desk</span></div>
+  <div class="hdr-right"><span id="mode" class="pill">—</span><span id="age" class="age"></span></div>
+</header>
+<main>
+  <section id="tab-desk" class="tab"></section>
+  <section id="tab-activity" class="tab hidden"></section>
+  <section id="tab-coin" class="tab hidden"></section>
+  <section id="tab-account" class="tab hidden"></section>
+</main>
+<nav class="tabs">
+  <button data-tab="desk" class="on"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/></svg>Desk</button>
+  <button data-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h18v2H3zm0 6h12v2H3z"/></svg>Activity</button>
+  <button data-tab="coin"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8v4h2V3h-8v2h4l-6 6-4-4-8 8z"/></svg>Coin</button>
+  <button data-tab="account"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5 0-9 2.5-9 5v3h18v-3c0-2.5-4-5-9-5z"/></svg>Account</button>
+</nav>
+<script src="chart.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
