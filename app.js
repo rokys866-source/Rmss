@@ -34,7 +34,10 @@ const sgn=v=>v==null?'—':(v>=0?'+':'-')+'$'+Math.abs(v).toFixed(2);
 const hm=t=>t?new Date(t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Stockholm'}):'—';
 const ago=t=>{if(!t)return'never';const s=Math.round(Date.now()/1000-t);return s<60?s+'s ago':s<3600?Math.round(s/60)+' min ago':Math.round(s/3600)+'h ago';};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const safeLink=u=>(typeof u==='string'&&u.startsWith('https://fomo.family/')&&u.includes('r=savipww'))?u:null;
+// only the exact shapes links.py produces (the app never builds a FOMO URL itself)
+const LINK_RE=[/^https:\/\/fomo\.family\/coin\?address=[A-Za-z0-9]+&chainId=(1399811149|4663|8453|56)&r=savipww&source=share_link$/,
+  /^https:\/\/fomo\.family\/profile\/[A-Za-z0-9_.]+\?source=share_link&r=savipww$/, /^https:\/\/fomo\.family\/r\/savipww$/];
+const safeLink=u=>(typeof u==='string'&&LINK_RE.some(r=>r.test(u)))?u:null;
 
 function banner(){
   const el=$('#banner');el.className='banner hidden';
@@ -62,7 +65,7 @@ function deskTab(){
   const lastFill=(B.activity||[]).find(a=>a.agent==='executor'&&a.kind==='bought');
   const fresh=lastFill&&(Date.now()/1000-lastFill.ts)<60;
   const audCoin=lastAud&&lastAud.mint&&B.coins[lastAud.mint];
-  const dots=audCoin&&audCoin.auditor?audCoin.auditor.layers.map(l=>`<i class="${l.ok?'ok':'bad'}"></i>`).join(''):'<i></i>'.repeat(8);
+  const dots=audCoin&&audCoin.auditor?audCoin.auditor.layers.map(l=>`<i class="${l.ok===true?'ok':(l.ok===false?'bad':'')}"></i>`).join(''):'<i></i>'.repeat(8);
   return `
   <div class="summary">
     <div class="kpi"><span>Stack</span><b>${money(S.stack)}</b></div>
@@ -113,10 +116,10 @@ function coinTab(){
     ${link?`<div class="btns"><a class="btn ${pos&&pos.status!=='closed'?'red':''}" href="${link}" target="_blank" rel="noopener">${pos&&pos.status!=='closed'?'Sell on FOMO':'Open on FOMO'}</a></div>`:''}</div>
   <div class="card"><h3><span>Audit</span><span>${au?(au.passed?'passed':'rejected'):'not audited'}</span></h3>
     <canvas class="disc" id="disc"></canvas>
-    <div class="layers">${au?au.layers.map(l=>`<div class="kv"><span>${l.n} · ${esc(l.name)}</span><span class="${l.ok?'ok':'bad'}">${esc(l.detail)}</span></div>`).join(''):'<div class="sub">The Auditor hasn\'t checked this coin.</div>'}</div></div>
+    <div class="layers">${au?au.layers.map(l=>`<div class="kv"><span>${l.n} · ${esc(l.name)}</span><span class="${l.ok===true?'ok':(l.ok===false?'bad':'sub')}">${esc(l.detail)}</span></div>`).join(''):'<div class="sub">The Auditor hasn\'t checked this coin.</div>'}</div></div>
   <div class="card"><div class="row"><div><h3><span>Analyst · ${an?esc(an.model):'—'}</span></h3>
     ${an&&an.answers?Object.entries(an.answers).map(([k,v])=>`<div class="kv"><span>${k}</span><span>${v.toFixed(2)}</span></div>`).join(''):`<div class="sub">${an?esc((an.failed||[])[0]||''):'Not scored'}</div>`}</div>
-    ${ringSVG(an?an.score:null,(B.settings||{})['analyst.score_min']||70)}</div></div>
+    ${ringSVG(an?an.score:null,(B.settings||{})['analyst.min_score']||70)}</div></div>
   ${ex?`<div class="card"><h3><span>Executor</span><span>${esc(ex.mode)}</span></h3><div class="kv"><span>Status</span><span>${esc(ex.status)}${ex.reason?' · '+esc(ex.reason):''}</span></div>
     <div class="kv"><span>Size</span><span>${ex.sizeUsd?money(ex.sizeUsd)+' · '+ex.stackPct+'% of stack':'—'}</span></div><div class="kv"><span>Signal price</span><span>${fmtPrice(ex.signalPrice)}</span></div></div>`:''}
   ${pos&&pos.status==='closed'?`<div class="card"><h3><span>Exit</span><span>${esc(pos.reason)}</span></h3><div class="kv"><span>Entry → exit</span><span>${fmtPrice(pos.entry_price)} → ${fmtPrice(pos.exit_price)}</span></div><div class="kv"><span>PnL after fees</span><span class="${pos.pnl_usd>=0?'ok':'bad'}">${sgn(pos.pnl_usd)} (${pos.pct.toFixed(1)}%)</span></div><div class="kv"><span>Fees</span><span>${money(pos.fees_usd)}</span></div></div>`:''}
@@ -134,11 +137,13 @@ function afterCoin(){
 function accountTab(){
   const s=B.settings||{};
   const groups=[['Desk',k=>!k.includes('.')],['Scanner',k=>k.startsWith('scanner.')],['Auditor',k=>k.startsWith('auditor.')],
-    ['Analyst (rules)',k=>k.startsWith('analyst')],['Executor',k=>k.startsWith('executor.')||k==='below_min'],['Risk',k=>k.startsWith('risk.')]];
+    ['Analyst (rules)',k=>k.startsWith('analyst')],['Executor',k=>k.startsWith('executor.')||k==='executor.below_min'],['Risk',k=>k.startsWith('risk.')]];
   return `<div class="card"><h3><span>Account</span><span>${B.sample?'sample':''}</span></h3>
-    <div class="kv"><span>FOMO handle</span><span>${esc(s.fomo_handle)}</span></div>
+    ${(()=>{const L=B.links||{},pu=safeLink(L.profile),su=safeLink(L.signup);return `
+    <div class="kv"><span>FOMO profile</span><span>${pu?`<a class="lnk" href="${pu}" target="_blank" rel="noopener">@${esc(s.fomo_handle)}</a>`:esc(s.fomo_handle)}</span></div>
+    ${su?`<div class="btns"><button class="btn" id="invite" data-url="${su}">Invite a friend</button></div>`:''}`})()}
     <div class="kv"><span>Mode</span><span>${esc(B.mode)}</span></div>
-    <div class="kv"><span>Analyst</span><span>${esc(s.analyst_mode)}</span></div>
+    <div class="kv"><span>Analyst</span><span>${esc(s['analyst.mode'])}</span></div>
     <div class="kv"><span>Notifications</span><span>Telegram</span></div>
     <div class="sub" style="margin-top:8px">Settings are read-only here. Change them on Telegram, e.g. <span class="mono">set risk.stop_pct 5</span>, <span class="mono">stack 1240</span>, <span class="mono">pause</span>.</div></div>
   ${groups.map(([g,f])=>{const ks=Object.keys(s).filter(f).filter(k=>!['fomo_handle'].includes(k));return ks.length?`<div class="grp">${g}</div><div class="card">${ks.map(k=>`<div class="kv"><span>${esc(k.replace(/^(scanner|auditor|analyst|executor|risk)\./,''))}</span><span>${esc(JSON.stringify(s[k]))}</span></div>`).join('')}</div>`:''}).join('')}
@@ -156,6 +161,10 @@ function render(){
   if(tab==='desk'){const bar=$('#exbar');if(bar&&!bar.classList.contains('done')){let p=0;const i=setInterval(()=>{p=Math.min(100,p+100/12);bar.firstChild.style.width=p+'%';$('#exbartx').textContent=p<100?`Executing... ${Math.round(p)}%`:'✓ Filled';if(p>=100){bar.classList.add('done');clearInterval(i);}},100);}}
 }
 document.addEventListener('click',e=>{
+  const iv=e.target.closest('#invite');if(iv){const u=iv.dataset.url;
+    if(navigator.share){navigator.share({title:'FOMO',text:'Join me on FOMO',url:u}).catch(()=>{});}
+    else if(navigator.clipboard){navigator.clipboard.writeText(u).then(()=>{iv.textContent='Link copied';});}else{window.open(u,'_blank');}
+    return;}
   const t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;render();return;}
   const c=e.target.closest('[data-coin]');if(c){sel=c.dataset.coin;tab='coin';render();window.scrollTo(0,0);}
 });

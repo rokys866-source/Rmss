@@ -51,3 +51,5 @@ canvas.chart{width:100%;height:220px;display:block}
 .tabs{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(15,20,27,.96);border-top:1px solid var(--line);padding:6px 0 calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(10px)}
 .tabs button{background:none;border:0;color:var(--mu);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
 .tabs svg{width:22px;height:22px;fill:currentColor}.tabs button.on{color:var(--gr)}
+
+.lnk{color:var(--gr);text-decoration:none}

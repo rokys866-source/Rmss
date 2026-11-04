@@ -22,7 +22,7 @@ window.drawPrice=function(cv,pts,o){o=o||{};const [c,w,h]=setup(cv);c.clearRect(
 };
 window.drawDisc=function(cv,layers,progress){const [c,w,h]=setup(cv);c.clearRect(0,0,w,h);const cx=w/2,cy=h/2,r=Math.min(w,h)/2-8,n=8;
   for(let i=0;i<n;i++){const a0=-Math.PI/2+i*2*Math.PI/n+0.04,a1=a0+2*Math.PI/n-0.08,l=layers&&layers[i];
-    let col='#2a3440';if(l&&progress>i)col=l.ok?'#21c37a':'#ff5b5b';
+    let col='#2a3440';if(l&&progress>i)col=l.ok===true?'#21c37a':(l.ok===false?'#ff5b5b':'#3a4552');
     c.beginPath();c.arc(cx,cy,r,a0,a1);c.arc(cx,cy,r*0.62,a1,a0,true);c.closePath();c.fillStyle=col;c.fill();
     const am=(a0+a1)/2;c.fillStyle='#0b0f14';c.font='bold 12px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(i+1),cx+Math.cos(am)*r*0.81,cy+Math.sin(am)*r*0.81);}
   const done=Math.min(n,Math.floor(progress)),green=(layers||[]).slice(0,done).filter(l=>l.ok).length;
