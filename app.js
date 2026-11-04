@@ -9,7 +9,7 @@ const $=s=>document.querySelector(s), RM=Charts.RM;
 let B=null, etag=null, err=null, lastOk=0, nextTry=0, tab=qs.get('tab')||'home', sheet=null, range='LIVE', actN=30, prevLast=null, prevMarks=-1, beamT=null;
 
 (function(){const m=location.hash.match(/[#&]g=([^&]+)/);
-  if(m){try{localStorage.setItem('gh',decodeURIComponent(m[1]));}catch(e){} history.replaceState(null,'',location.pathname+location.search);}})();
+  if(m){try{localStorage.setItem('gh',decodeURIComponent(m[1]));}catch(e){}}})();   // hash kept on purpose: iOS Add to Home Screen saves this URL, and the icon has its own storage
 const token=()=>{try{return localStorage.getItem('gh')}catch(e){return null}};
 
 async function load(){
@@ -66,7 +66,9 @@ function errRow(){const e=$('#err');
   else e.classList.add('hidden');}
 setInterval(errRow,1000);
 function setup(){
-  if(err.kind==='token')return `<div class="empty"><b>Open your setup link once</b><p>This phone has no access key yet. Open the one-time link from Telegram (it ends in <span class="mono">#g=…</span>). The key stays on this phone only.</p></div>`;
+  if(err.kind==='token')return `<div class="empty"><b>Open your setup link once</b><p>This phone has no access key yet. Open the setup link from Telegram in Safari, then tap Share › Add to Home Screen from that page. Or paste the link here:</p>
+    <input id="glink" type="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste your setup link from Telegram" style="width:100%;min-height:44px;margin:10px 0;padding:0 12px;border-radius:10px;border:1px solid #444;background:#1c1c1e;color:#fff;font-size:16px">
+    <button class="btn gh" id="gsave">Save</button><p id="gmsg" class="s"></p><p class="s">The key stays on this phone only.</p></div>`;
   if(err.kind==='auth')return `<div class="empty"><b>Access key refused (${err.code})</b><p>Make a new read-only key for the data repo and open the setup link again.</p><button class="btn gh" id="forget">Forget this key</button></div>`;
   return null;}
 const skel=()=>`<div class="sk" style="height:66px;width:70%;margin:12px 0"></div><div class="sk" style="height:22px;width:40%"></div><div class="sk" style="height:220px;margin:14px 0"></div><div class="sk" style="height:44px"></div><div class="sk" style="height:${Math.round((innerWidth-32)*470/504)}px;margin:18px 0;border-radius:${Math.round((innerWidth-32)*42/504)}px"></div><div class="sk" style="height:300px"></div>`;
@@ -237,7 +239,10 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,[data-clo
   if(t.id==='avatar'){tab='account';sheet=null;renderSheet();render();return;}
   if(t.id==='search'&&B){open('search');return;}
   if(t.id==='bell'&&B){open('bell');$('#belldot').classList.add('hidden');return;}
-  if(t.id==='forget'){try{localStorage.removeItem('gh');}catch(x){}location.reload();return;}
+  if(t.id==='forget'){try{localStorage.removeItem('gh');}catch(x){}location.replace(location.pathname+location.search);return;}
+  if(t.id==='gsave'){const v=($('#glink').value||'').trim(),m=v.match(/[#&?]g=([^&#\s]+)/);
+    if(!m){$('#gmsg').textContent='That link has no key in it (it should contain #g=…).';return;}
+    try{localStorage.setItem('gh',decodeURIComponent(m[1]));}catch(x){}$('#glink').value='';err=null;load();return;}
   if(t.id==='invite'){const u=safeLink(B.links.signup);if(!u)return;
     if(navigator.share)navigator.share({url:u}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied'));return;}
 });
